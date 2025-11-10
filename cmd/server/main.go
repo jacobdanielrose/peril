@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -37,9 +38,41 @@ func main() {
 	}
 	fmt.Println("Pause message sent!")
 
-	// // wait for ctrl+c
-	// signalChan := make(chan os.Signal, 1)
-	// signal.Notify(signalChan, os.Interrupt)
-	// <-signalChan
-	// fmt.Println("RabbitMQ connection closed.")
+	gamelogic.PrintServerHelp()
+
+out:
+	for {
+		input := gamelogic.GetInput()
+		if len(input) == 0 {
+			continue
+		}
+
+		switch input[0] {
+		case "pause":
+			fmt.Println("Sending pause message")
+			pubsub.PublishJOSN(
+				publishCh,
+				routing.ExchangePerilDirect,
+				routing.PauseKey,
+				routing.PlayingState{
+					IsPaused: true,
+				},
+			)
+		case "resume":
+			fmt.Println("Sending pause message")
+			pubsub.PublishJOSN(
+				publishCh,
+				routing.ExchangePerilDirect,
+				routing.PauseKey,
+				routing.PlayingState{
+					IsPaused: false,
+				},
+			)
+		case "quit":
+			fmt.Println("Exiting...")
+			break out
+		default:
+			fmt.Println("Unsure")
+		}
+	}
 }

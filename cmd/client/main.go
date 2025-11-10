@@ -40,9 +40,13 @@ func main() {
 	}
 	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
 
+	gamestate := gamelogic.NewGameState(username)
+
 	// wait for ctrl+c
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
+
+	gamestate.
 	<-signalChan
 	fmt.Println("RabbitMQ connection closed.")
 
