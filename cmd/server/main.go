@@ -25,7 +25,19 @@ func main() {
 		log.Fatalf("could not create channel: %v", err)
 	}
 
-	err = pubsub.PublishJOSN(
+	_, _, err = pubsub.DeclareAndBind(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		"game_logs.*",
+		pubsub.SimpleQueueDurable,
+	)
+
+	if err != nil {
+		log.Fatalf("could not declare and bind queue: %v", err)
+	}
+
+	err = pubsub.PublishJSON(
 		publishCh,
 		routing.ExchangePerilDirect,
 		routing.PauseKey,
@@ -50,7 +62,7 @@ out:
 		switch input[0] {
 		case "pause":
 			fmt.Println("Sending pause message")
-			pubsub.PublishJOSN(
+			pubsub.PublishJSON(
 				publishCh,
 				routing.ExchangePerilDirect,
 				routing.PauseKey,
@@ -60,7 +72,7 @@ out:
 			)
 		case "resume":
 			fmt.Println("Sending pause message")
-			pubsub.PublishJOSN(
+			pubsub.PublishJSON(
 				publishCh,
 				routing.ExchangePerilDirect,
 				routing.PauseKey,
