@@ -1,6 +1,8 @@
 package pubsub
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 
@@ -22,6 +24,29 @@ const (
 	SimpleQueueTransient
 )
 
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
+	handler func(T) AckType,
+) error {
+	return subscribe(
+		conn,
+		exchange,
+		queueName,
+		key,
+		queueType,
+		handler,
+		func(data []byte) (T, error) {
+			var target T
+			err := gob.NewDecoder(bytes.NewBuffer(data)).Decode(&target)
+			return target, err
+		},
+	)
+}
+
 func SubscribeJSON[T any](
 	conn *amqp.Connection,
 	exchange,
@@ -30,13 +55,31 @@ func SubscribeJSON[T any](
 	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
 	handler func(T) AckType,
 ) error {
-	ch, queue, err := DeclareAndBind(
+	return subscribe(
 		conn,
 		exchange,
 		queueName,
 		key,
 		queueType,
+		handler,
+		func(data []byte) (T, error) {
+			var target T
+			err := json.Unmarshal(data, &target)
+			return target, err
+		},
 	)
+}
+
+func subscribe[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	simpleQueueType SimpleQueueType,
+	handler func(T) AckType,
+	unmarshaller func([]byte) (T, error),
+) error {
+	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType)
 	if err != nil {
 		return fmt.Errorf("could not declare and bind queue: %v", err)
 	}
@@ -51,13 +94,13 @@ func SubscribeJSON[T any](
 		nil,        // args
 	)
 	if err != nil {
-		return fmt.Errorf("could not consume messages: %v", err)
+		return fmt.Errorf("could not consume from queue: %v", err)
 	}
 
 	go func() {
 		for msg := range msgs {
-			var val T
-			if err := json.Unmarshal(msg.Body, &val); err != nil {
+			val, err := unmarshaller(msg.Body)
+			if err != nil {
 				continue
 			}
 			switch handler(val) {
